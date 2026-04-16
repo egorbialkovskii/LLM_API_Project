@@ -1,29 +1,24 @@
 from contextlib import asynccontextmanager
+from importlib import import_module
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 
-try:
-    from app.api.routes_auth import router as auth_router
-except ImportError:
-    auth_router = None
+from app.db.base import Base
 
-try:
-    from app.api.routes_chat import router as chat_router
-except ImportError:
-    chat_router = None
 
-try:
-    from app.db.base import Base
-except ImportError:
-    Base = None
+def get_router(module_path: str):
+    """Return a router from a module when it is defined."""
+    module = import_module(module_path)
+    return getattr(module, "router", None)
 
-try:
-    from app.db.session import engine
-except ImportError:
-    engine = None
+
+def get_engine():
+    """Return the configured SQLAlchemy engine when it is defined."""
+    module = import_module("app.db.session")
+    return getattr(module, "engine", None)
 
 
 def is_cors_enabled() -> bool:
@@ -55,6 +50,9 @@ def setup_cors(app: FastAPI) -> None:
 
 def include_routers(app: FastAPI) -> None:
     """Register API routers that are available in the project."""
+    auth_router = get_router("app.api.routes_auth")
+    chat_router = get_router("app.api.routes_chat")
+
     if auth_router is not None:
         app.include_router(auth_router)
 
@@ -64,11 +62,18 @@ def include_routers(app: FastAPI) -> None:
 
 async def create_tables() -> None:
     """Create database tables on application startup."""
-    if Base is None or engine is None:
+    engine = get_engine()
+
+    if engine is None:
         return
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if hasattr(engine, "sync_engine"):
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        return
+
+    with engine.begin() as conn:
+        Base.metadata.create_all(bind=conn)
 
 
 @asynccontextmanager
