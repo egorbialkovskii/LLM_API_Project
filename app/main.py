@@ -1,93 +1,95 @@
-from __future__ import annotations
-
-import os
 from contextlib import asynccontextmanager
-from importlib import import_module
-from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import settings
 
-def _get_app_title() -> str:
-    return os.getenv("APP_NAME", "llm-p")
+try:
+    from app.api.routes_auth import router as auth_router
+except ImportError:
+    auth_router = None
+
+try:
+    from app.api.routes_chat import router as chat_router
+except ImportError:
+    chat_router = None
+
+try:
+    from app.db.base import Base
+except ImportError:
+    Base = None
+
+try:
+    from app.db.session import engine
+except ImportError:
+    engine = None
 
 
-def _get_environment() -> str:
-    return os.getenv("ENV", "local")
+def is_cors_enabled() -> bool:
+    """Return whether CORS middleware should be enabled."""
+    return settings.cors_enabled
 
 
-def _is_cors_enabled() -> bool:
-    return os.getenv("CORS_ENABLED", "").lower() in {"1", "true", "yes", "on"}
-
-
-def _get_cors_origins() -> list[str]:
-    raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "")
+def get_cors_origins() -> list[str]:
+    """Return the list of allowed CORS origins from the environment."""
+    raw_origins = settings.cors_allow_origins
     if not raw_origins.strip():
         return ["*"]
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 
-def _include_router_if_available(app: FastAPI, module_path: str) -> None:
-    try:
-        module = import_module(module_path)
-    except Exception:
+def setup_cors(app: FastAPI) -> None:
+    """Attach CORS middleware to the application when enabled."""
+    if not is_cors_enabled():
         return
 
-    router = getattr(module, "router", None)
-    if router is not None:
-        app.include_router(router)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_cors_origins(),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
-async def _run_create_all_if_possible() -> None:
-    try:
-        db_base = import_module("app.db.base")
-        db_session = import_module("app.db.session")
-    except Exception:
+def include_routers(app: FastAPI) -> None:
+    """Register API routers that are available in the project."""
+    if auth_router is not None:
+        app.include_router(auth_router)
+
+    if chat_router is not None:
+        app.include_router(chat_router)
+
+
+async def create_tables() -> None:
+    """Create database tables on application startup."""
+    if Base is None or engine is None:
         return
 
-    base = getattr(db_base, "Base", None)
-    engine = getattr(db_session, "engine", None)
-    metadata = getattr(base, "metadata", None)
-
-    if metadata is None or engine is None:
-        return
-
-    if hasattr(engine, "sync_engine"):
-        async with engine.begin() as conn:
-            await conn.run_sync(metadata.create_all)
-        return
-
-    with engine.begin() as conn:
-        metadata.create_all(bind=conn)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 @asynccontextmanager
-async def _lifespan(_: FastAPI):
-    await _run_create_all_if_possible()
+async def lifespan(_: FastAPI):
+    """Run startup tasks before the application begins serving requests."""
+    await create_tables()
     yield
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=_get_app_title(), lifespan=_lifespan)
+    """Build and configure the FastAPI application instance."""
+    app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
-    if _is_cors_enabled():
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=_get_cors_origins(),
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-
-    _include_router_if_available(app, "app.api.routes_auth")
-    _include_router_if_available(app, "app.api.routes_chat")
+    setup_cors(app)
+    include_routers(app)
 
     @app.get("/health")
-    async def healthcheck() -> dict[str, Any]:
+    async def healthcheck() -> dict[str, str]:
         return {
             "status": "ok",
-            "environment": _get_environment(),
+            "environment": settings.env,
         }
 
     return app
