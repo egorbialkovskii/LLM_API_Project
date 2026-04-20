@@ -19,5 +19,5 @@
       "ruff>=0.14.14",
     ]
     
-    [tool.uv]
-    dev-dependencies = []
+[dependency-groups]
+dev = []

@@ -33,7 +33,13 @@ FastAPI-проект с JWT-аутентификацией, SQLite и интег
 
 ## Переменные окружения
 
-Приложение использует `.env` со следующими параметрами:
+Перед запуском нужно создать файл `.env`. Удобнее всего взять за основу `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Приложение использует следующие параметры:
 
 - `APP_NAME`
 - `ENV`
@@ -49,10 +55,28 @@ FastAPI-проект с JWT-аутентификацией, SQLite и интег
 
 ## Запуск
 
+Создание виртуального окружения через `uv`:
+
+```bash
+uv venv
+```
+
+Активация окружения:
+
+```bash
+source .venv/bin/activate
+```
+
+Компиляция зависимостей из `pyproject.toml`:
+
+```bash
+uv pip compile pyproject.toml -o requirements.txt
+```
+
 Установка зависимостей:
 
 ```bash
-uv sync
+uv pip install -r requirements.txt
 ```
 
 Запуск сервера:
@@ -71,6 +95,13 @@ Swagger UI:
 
 ```text
 http://127.0.0.1:8000/docs
+```
+
+Если не хочется использовать `requirements.txt`, проект также запускается через короткий вариант:
+
+```bash
+uv sync
+uv run uvicorn app.main:app --reload
 ```
 
 ## Как работает сценарий
