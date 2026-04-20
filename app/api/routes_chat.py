@@ -17,7 +17,6 @@ async def ask_chat(
     user_id: int = Depends(get_current_user_id),
     use_case: ChatUseCase = Depends(get_chat_use_case),
 ) -> ChatResponse:
-    """Send a prompt to the chat use case and return the assistant answer."""
     try:
         answer = await use_case.ask(
             user_id=user_id,
@@ -41,7 +40,6 @@ async def get_chat_history(
     use_case: ChatUseCase = Depends(get_chat_use_case),
     limit: int = Query(default=50, ge=0, le=100),
 ) -> list[ChatMessageResponse]:
-    """Return recent chat history for the current user."""
     return await use_case.get_history(
         user_id=user_id,
         limit=limit,
@@ -53,6 +51,5 @@ async def delete_chat_history(
     user_id: int = Depends(get_current_user_id),
     use_case: ChatUseCase = Depends(get_chat_use_case),
 ) -> Response:
-    """Delete the current user's chat history."""
     await use_case.clear_history(user_id=user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

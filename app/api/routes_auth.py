@@ -22,7 +22,6 @@ async def register(
     payload: RegisterRequest,
     use_case: AuthUseCase = Depends(get_auth_use_case),
 ) -> UserPublic:
-    """Register a new user account."""
     try:
         return await use_case.register(
             email=payload.email,
@@ -40,7 +39,6 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     use_case: AuthUseCase = Depends(get_auth_use_case),
 ) -> TokenResponse:
-    """Authenticate the user via OAuth2 form fields and return a bearer token."""
     try:
         return await use_case.login(
             email=form_data.username,
@@ -59,7 +57,6 @@ async def get_me(
     user_id: int = Depends(get_current_user_id),
     use_case: AuthUseCase = Depends(get_auth_use_case),
 ) -> UserPublic:
-    """Return the current authenticated user's public profile."""
     try:
         return await use_case.get_profile(user_id)
     except NotFoundError as exc:

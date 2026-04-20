@@ -40,7 +40,6 @@ class OpenRouterClient:
         messages: list[ChatCompletionMessage],
         temperature: float = 0.7,
     ) -> dict:
-        """Send a chat completion request to OpenRouter."""
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.post(
@@ -53,10 +52,20 @@ class OpenRouterClient:
                     },
                 )
         except httpx.HTTPError as exc:
-            raise ExternalServiceError(self._build_request_error_message(exc)) from exc
+            if isinstance(exc, httpx.TimeoutException):
+                raise ExternalServiceError("OpenRouter did not respond in time") from exc
+
+            message = str(exc).strip()
+            if message:
+                raise ExternalServiceError(f"OpenRouter request failed: {message}") from exc
+
+            raise ExternalServiceError("OpenRouter request failed") from exc
 
         if response.is_error:
-            raise ExternalServiceError(self._build_error_message(response))
+            detail = self._get_error_detail(response)
+            if detail:
+                raise ExternalServiceError(f"OpenRouter error: {detail}")
+            raise ExternalServiceError(f"OpenRouter error: HTTP {response.status_code}")
 
         return response.json()
 
@@ -69,36 +78,21 @@ class OpenRouterClient:
             "Content-Type": "application/json",
         }
 
-    def _build_request_error_message(self, exc: httpx.HTTPError) -> str:
-        """Return a stable domain error message from an HTTP client exception."""
-        if isinstance(exc, httpx.TimeoutException):
-            return "OpenRouter request timed out"
-
-        request = getattr(exc, "request", None)
-        request_url = str(request.url) if request is not None else self._base_url
-        exc_message = str(exc).strip()
-
-        if exc_message:
-            return f"OpenRouter request failed: {exc_message}"
-
-        return f"OpenRouter request failed while calling {request_url}"
-
-    def _build_error_message(self, response: httpx.Response) -> str:
-        """Return a stable domain error message from an OpenRouter error response."""
+    def _get_error_detail(self, response: httpx.Response) -> str | None:
         try:
             payload = response.json()
         except ValueError:
-            payload = None
+            return None
 
         if isinstance(payload, dict):
             error = payload.get("error")
             if isinstance(error, dict):
                 message = error.get("message")
                 if isinstance(message, str) and message.strip():
-                    return f"OpenRouter error: {message}"
+                    return message.strip()
 
             message = payload.get("message")
             if isinstance(message, str) and message.strip():
-                return f"OpenRouter error: {message}"
+                return message.strip()
 
-        return f"OpenRouter error: HTTP {response.status_code}"
+        return None

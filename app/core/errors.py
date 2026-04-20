@@ -10,17 +10,16 @@ class ConflictError(AppError):
     """Raised when an entity conflicts with existing data."""
     pass
 
+
 class UnauthorizedError(AppError):
     """Raised when authentication fails."""
     pass
 
-class ForbiddenError(AppError):
-    """Raised when the user does not have enough permissions."""
-    pass
 
 class NotFoundError(AppError):
     """Raised when an entity cannot be found."""
     pass
+
 
 class ExternalServiceError(AppError):
     """Raised when an external service returns an error."""
