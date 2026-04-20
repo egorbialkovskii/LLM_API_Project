@@ -18,3 +18,7 @@ uv.lock
 
 # Logs
 *.log
+
+.ruff_cache
+
+.DS_Store
