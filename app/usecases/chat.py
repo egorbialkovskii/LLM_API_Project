@@ -113,5 +113,18 @@ class ChatUseCase:
         content = message.get("content")
         if isinstance(content, str) and content.strip():
             return content
+        if isinstance(content, list):
+            text_parts: list[str] = []
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("type") != "text":
+                    continue
+                text = part.get("text")
+                if isinstance(text, str) and text.strip():
+                    text_parts.append(text)
+
+            if text_parts:
+                return "\n".join(text_parts)
 
         raise ExternalServiceError("OpenRouter returned an empty response")

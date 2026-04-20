@@ -53,7 +53,7 @@ class OpenRouterClient:
                     },
                 )
         except httpx.HTTPError as exc:
-            raise ExternalServiceError("OpenRouter request failed") from exc
+            raise ExternalServiceError(self._build_request_error_message(exc)) from exc
 
         if response.is_error:
             raise ExternalServiceError(self._build_error_message(response))
@@ -68,6 +68,20 @@ class OpenRouterClient:
             "X-Title": self._title,
             "Content-Type": "application/json",
         }
+
+    def _build_request_error_message(self, exc: httpx.HTTPError) -> str:
+        """Return a stable domain error message from an HTTP client exception."""
+        if isinstance(exc, httpx.TimeoutException):
+            return "OpenRouter request timed out"
+
+        request = getattr(exc, "request", None)
+        request_url = str(request.url) if request is not None else self._base_url
+        exc_message = str(exc).strip()
+
+        if exc_message:
+            return f"OpenRouter request failed: {exc_message}"
+
+        return f"OpenRouter request failed while calling {request_url}"
 
     def _build_error_message(self, response: httpx.Response) -> str:
         """Return a stable domain error message from an OpenRouter error response."""
