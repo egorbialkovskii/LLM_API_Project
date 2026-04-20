@@ -38,6 +38,7 @@ class OpenRouterClient:
     async def create_chat_completion(
         self,
         messages: list[ChatCompletionMessage],
+        temperature: float = 0.7,
     ) -> dict:
         """Send a chat completion request to OpenRouter."""
         try:
@@ -48,6 +49,7 @@ class OpenRouterClient:
                     json={
                         "model": self._model,
                         "messages": messages,
+                        "temperature": temperature,
                     },
                 )
         except httpx.HTTPError as exc:

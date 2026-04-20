@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.core.errors import ExternalServiceError
 from app.repositories.chat_messages import ChatMessagesRepository
+from app.schemas.chat import ChatMessageResponse
 from app.services.openrouter_client import ChatCompletionMessage, OpenRouterClient
 
 
@@ -23,6 +24,7 @@ class ChatUseCase:
         prompt: str,
         system: str | None = None,
         max_history: int = 10,
+        temperature: float = 0.7,
     ) -> str:
         """Build model messages, persist the dialogue, and return the answer."""
         messages: list[ChatCompletionMessage] = []
@@ -60,7 +62,10 @@ class ChatUseCase:
             content=prompt,
         )
 
-        response = await self._openrouter_client.create_chat_completion(messages)
+        response = await self._openrouter_client.create_chat_completion(
+            messages,
+            temperature=temperature,
+        )
         answer = self._extract_answer(response)
 
         await self._messages_repository.create(
@@ -70,6 +75,26 @@ class ChatUseCase:
         )
 
         return answer
+
+    async def get_history(
+        self,
+        *,
+        user_id: int,
+        limit: int = 50,
+    ) -> list[ChatMessageResponse]:
+        """Return recent chat history for a user in chronological order."""
+        history = await self._messages_repository.get_recent_by_user_id(
+            user_id=user_id,
+            limit=limit,
+        )
+        return [
+            ChatMessageResponse.model_validate(message)
+            for message in reversed(history)
+        ]
+
+    async def clear_history(self, *, user_id: int) -> None:
+        """Delete the stored chat history for a user."""
+        await self._messages_repository.delete_by_user_id(user_id)
 
     def _extract_answer(self, response: dict) -> str:
         """Extract assistant text from an OpenRouter chat completion response."""
