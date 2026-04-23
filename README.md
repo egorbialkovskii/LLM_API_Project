@@ -118,6 +118,10 @@ uv run uvicorn app.main:app --reload
 
 ![Registration](photos/registration.png)
 
+### Login
+
+![Login](photos/login.png)
+
 ### Auth
 
 ![Auth](photos/auth.png)
